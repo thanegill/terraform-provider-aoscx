@@ -50,4 +50,4 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace github.com/aruba/aoscxgo => github.com/thanegill/aoscxgo v0.0.1-pre.nixos.2
+replace github.com/aruba/aoscxgo => github.com/thanegill/aoscxgo v0.0.1-pre.nixos.3
