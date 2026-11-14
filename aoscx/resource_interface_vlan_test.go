@@ -43,12 +43,13 @@ func TestInterfaceAdoptsAPortWithItsDeclaredDescription(t *testing.T) {
 }
 
 // With the top-level admin null, the admin state is user_config's, up when
-// that has none.
+// that has none. aoscx_interface never writes it, so a port shut down, as
+// aoscx_port_settings or the CLI does, plans no change.
 func TestInterfaceReadsTheAdminStateFromUserConfig(t *testing.T) {
 	sw := newFakeSwitch(t)
 	portOnSwitch(sw)
 	p := configuredProvider(t, sw)
-	config := p.config("aoscx_interface", map[string]interface{}{"name": "1/1/1", "description": "old", "admin_state": "down"})
+	config := p.config("aoscx_interface", map[string]interface{}{"name": "1/1/1", "description": "old"})
 	state, errs := p.create("aoscx_interface", config)
 	expectOK(t, "create", errs)
 	expectState(t, state, `{"admin_state": "up"}`)

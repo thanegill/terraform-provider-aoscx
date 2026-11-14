@@ -30,10 +30,11 @@ func resourceInterface() *schema.Resource {
 			},
 			"admin_state": &schema.Schema{
 				Type:         schema.TypeString,
-				Required:     false,
-				Default:      "up",
 				Optional:     true,
+				Computed:     true,
 				ValidateFunc: validation.StringInSlice([]string{"up", "down"}, true),
+				Deprecated:   "aoscx_interface reads the port's admin state but never writes it; set it with aoscx_port_settings.",
+				Description:  "The port's admin state as read. Nothing writes it here; aoscx_port_settings sets it.",
 			},
 		},
 	}
