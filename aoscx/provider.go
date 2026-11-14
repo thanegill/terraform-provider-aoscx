@@ -57,6 +57,7 @@ func Provider() *schema.Provider {
 			"aoscx_snmpv3_user":    resourceSnmpv3User(),
 			"aoscx_user":           resourceUser(),
 			"aoscx_port_settings":  resourcePortSettings(),
+			"aoscx_syslog_remote":  resourceSyslogRemote(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
