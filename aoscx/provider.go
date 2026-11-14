@@ -74,7 +74,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 			},
 		)
 
-		if (sw.Cookie == nil) || (err != nil) {
+		if err != nil {
 			return nil, diag.FromErr(err)
 		}
 

@@ -3,6 +3,7 @@ package aoscx
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/aruba/aoscxgo"
 
@@ -103,7 +104,12 @@ func resourceVlanRead(ctx context.Context, d *schema.ResourceData, m interface{}
 	err = tmp_vlan.Get(sw)
 
 	if err != nil {
-		// Failure in VLAN retrieval
+		// Only a VLAN the switch answers it lacks is forgotten and planned
+		// again; any other failure, no answer at all included, is an error.
+		status := err.(*aoscxgo.RequestError).StatusCode
+		if !strings.HasPrefix(status, "404 ") {
+			return diag.Errorf("Error in reading VLAN %d: %s", tmp_vlan.VlanId, status)
+		}
 		d.SetId("")
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
@@ -132,6 +138,11 @@ func resourceVlanUpdate(ctx context.Context, d *schema.ResourceData, m interface
 	}
 
 	err = tmp_vlan.Get(sw)
+
+	// The PATCH sends every attribute, taking the unchanged ones from this read.
+	if err != nil {
+		return diag.Errorf("Error in reading VLAN %d: %s", tmp_vlan.VlanId, err.(*aoscxgo.RequestError).StatusCode)
+	}
 
 	if d.HasChange("name") {
 		tmp_vlan.Name = d.Get("name").(string)

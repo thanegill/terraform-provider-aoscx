@@ -111,15 +111,10 @@ func resourceInterfaceRead(ctx context.Context, d *schema.ResourceData, m interf
 	//tmp_vlan.GetStatus() will return if existing
 	err = tmp_int.Get(sw)
 
+	// A port always exists, so a failed read is an error rather than a reason
+	// to forget the resource and plan its creation again.
 	if err != nil {
-		//Failure in VLAN retrieval
-		d.SetId("")
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Warning,
-			Summary:  "Interface Not Found",
-			Detail:   "Interface Not Found",
-		})
-		return diags
+		return diag.Errorf("Error in reading %s: %s", tmp_int.Name, err.(*aoscxgo.RequestError).StatusCode)
 	}
 
 	d.Set("name", tmp_int.Name)
@@ -142,6 +137,11 @@ func resourceInterfaceUpdate(ctx context.Context, d *schema.ResourceData, m inte
 	}
 	//tmp_vlan.GetStatus() will return if existing
 	err = tmp_int.Get(sw)
+
+	// An unchanged description would otherwise be taken from a failed read.
+	if err != nil {
+		return diag.Errorf("Error in reading %s: %s", tmp_int.Name, err.(*aoscxgo.RequestError).StatusCode)
+	}
 
 	if d.HasChange("description") {
 		tmp_int.Description = d.Get("description").(string)
