@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 
@@ -245,11 +246,25 @@ func readBack(ctx context.Context, d *schema.ResourceData, m interface{}, read s
 		return diag.Errorf("the switch took the write, but has no %s", label)
 	}
 	for _, name := range names {
-		if !sameJSON(d.Get(name), declared[name]) {
+		if !sameJSON(setElements(d.Get(name)), setElements(declared[name])) {
 			return diag.Errorf("the switch took the write, but its %s has %s %v, not %v", label, name, d.Get(name), declared[name])
 		}
 	}
 	return nil
+}
+
+// setElements is an attribute's value as sameJSON can compare it: a set as
+// its elements, sorted.
+func setElements(value interface{}) interface{} {
+	set, ok := value.(*schema.Set)
+	if !ok {
+		return value
+	}
+	elements := set.List()
+	sort.Slice(elements, func(i, j int) bool {
+		return fmt.Sprint(elements[i]) < fmt.Sprint(elements[j])
+	})
+	return elements
 }
 
 // restKey is a collection member's key as its path takes it.

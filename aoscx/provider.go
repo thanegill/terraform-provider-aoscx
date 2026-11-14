@@ -55,6 +55,7 @@ func Provider() *schema.Provider {
 			"aoscx_vrf_dns":        resourceVrfDns(),
 			"aoscx_system_snmp":    resourceSystemSnmp(),
 			"aoscx_snmpv3_user":    resourceSnmpv3User(),
+			"aoscx_user":           resourceUser(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
