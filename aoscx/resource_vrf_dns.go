@@ -67,9 +67,47 @@ func refuseVrfDnsRemovals(ctx context.Context, d *schema.ResourceDiff, m interfa
 	for _, server := range haveServers[len(wantServers):] {
 		extra = append(extra, server.(string))
 	}
+	return undeclaredNameServers(d.Id(), extra)
+}
+
+func undeclaredNameServers(vrf string, extra []string) error {
 	return fmt.Errorf("the switch's DNS client of VRF %s has name servers at priorities nothing declares: %s. "+
 		"A PATCH cannot remove one, so refusing; remove each at the CLI with "+
-		"'no ip dns server-address <address> vrf %s'", d.Id(), strings.Join(extra, ", "), d.Id())
+		"'no ip dns server-address <address> vrf %s'", vrf, strings.Join(extra, ", "), vrf)
+}
+
+// refuseUndeclaredNameServers refuses to create a VRF's DNS client whose
+// switch has name servers at priorities past the declared ones, before
+// writing anything: the PATCH could not remove them, and the read after it
+// would take them into state.
+func refuseUndeclaredNameServers(sw *aoscxgo.Client, vrf string, declared int) error {
+	attributes, err := restAttributes(sw, vrfPath(vrf), "dns_name_servers")
+	if err != nil {
+		return fmt.Errorf("could not read the DNS client of VRF %s: %s", vrf, err)
+	}
+	servers, err := restMap(attributes, "dns_name_servers")
+	if err != nil {
+		return err
+	}
+	priorities := []int{}
+	for key := range servers {
+		priority, err := strconv.Atoi(key)
+		if err != nil {
+			return fmt.Errorf("VRF %s has a name server at the priority %q, not a number", vrf, key)
+		}
+		if priority >= declared {
+			priorities = append(priorities, priority)
+		}
+	}
+	if len(priorities) == 0 {
+		return nil
+	}
+	sort.Ints(priorities)
+	extra := []string{}
+	for _, priority := range priorities {
+		extra = append(extra, fmt.Sprint(servers[strconv.Itoa(priority)]))
+	}
+	return undeclaredNameServers(vrf, extra)
 }
 
 func writeVrfDns(d *schema.ResourceData, m interface{}, vrf string, all bool) diag.Diagnostics {
@@ -93,6 +131,9 @@ func writeVrfDns(d *schema.ResourceData, m interface{}, vrf string, all bool) di
 
 func resourceVrfDnsCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	vrf := d.Get("vrf").(string)
+	if err := refuseUndeclaredNameServers(m.(*aoscxgo.Client), vrf, len(d.Get("name_servers").([]interface{}))); err != nil {
+		return diag.FromErr(err)
+	}
 	if diags := writeVrfDns(d, m, vrf, true); diags.HasError() {
 		return diags
 	}

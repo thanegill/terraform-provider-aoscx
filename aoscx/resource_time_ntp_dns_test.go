@@ -136,6 +136,7 @@ func TestVrfDnsCreateUpdateDeleteImport(t *testing.T) {
 	expectOK(t, "create", errs)
 	expectRequests(t, sw.requests(),
 		"GET /system/vrfs/default?attributes=dns_name_servers",
+		"GET /system/vrfs/default?attributes=dns_name_servers",
 		`PATCH /system/vrfs/default {"dns_domain_name": "example.com", "dns_name_servers": {"0": "10.0.0.53", "1": "10.0.0.54"}}`,
 		"GET /system/vrfs/default?attributes=dns_domain_name,dns_name_servers",
 		"GET /system/vrfs/default?attributes=dns_domain_name,dns_name_servers",
@@ -165,6 +166,24 @@ func TestVrfDnsCreateUpdateDeleteImport(t *testing.T) {
 	expectOK(t, "import", errs)
 	p.expectNoChanges(t, "aoscx_vrf_dns", imported, config)
 	expectRequests(t, sw.writes())
+}
+
+// A create over a switch with more name servers than declared would leave
+// the extra ones, which a PATCH cannot remove, so it is refused before any
+// write.
+func TestVrfDnsCreateRefusesNameServersNothingDeclares(t *testing.T) {
+	sw := newFakeSwitch(t)
+	sw.resource("/system/vrfs/default", `{"dns_name_servers": {"0": "10.0.0.1", "1": "10.0.0.2", "2": "10.0.0.3"}, "dns_domain_name": null}`)
+	p := configuredProvider(t, sw)
+	state, errs := p.create("aoscx_vrf_dns", p.config("aoscx_vrf_dns", map[string]interface{}{
+		"vrf": "default", "name_servers": []string{"10.0.0.53"}, "domain_name": "example.com",
+	}))
+	expectError(t, "create", errs, "the switch's DNS client of VRF default has name servers at priorities nothing declares: "+
+		"10.0.0.2, 10.0.0.3. A PATCH cannot remove one")
+	expectRequests(t, sw.requests(), "GET /system/vrfs/default?attributes=dns_name_servers")
+	if !state.IsNull() {
+		t.Errorf("a refused create left %v", attributes(state))
+	}
 }
 
 func TestVrfDnsRefusesNameServerPriorityGaps(t *testing.T) {
