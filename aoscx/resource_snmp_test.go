@@ -127,6 +127,25 @@ func TestSnmpv3UserCreateTakesBothPassPhrases(t *testing.T) {
 	expectRequests(t, sw.requests())
 }
 
+// A new pass_phrase_wo_version replaces the user, and the create it plans
+// takes both pass phrases, so the plan fails before the destroy.
+func TestSnmpv3UserReplacedWithoutPassPhrasesIsRefused(t *testing.T) {
+	sw := newFakeSwitch(t)
+	p := configuredProvider(t, sw)
+	p.secret(snmpAuthSecret)
+	p.secret(snmpPrivSecret)
+	state, errs := p.create("aoscx_snmpv3_user", p.config("aoscx_snmpv3_user", snmpUserConfig(nil)))
+	expectOK(t, "create", errs)
+	sw.requests()
+	_, errs = p.apply("aoscx_snmpv3_user", state, p.config("aoscx_snmpv3_user", snmpUserConfig(map[string]interface{}{
+		"pass_phrase_wo_version": 2, "auth_pass_phrase_wo": nil, "priv_pass_phrase_wo": nil,
+	})))
+	expectError(t, "a replacement without pass phrases", errs, "SNMPv3 user monitor: creating it takes auth_pass_phrase_wo")
+	expectRequests(t, sw.requests())
+	expectAttributes(t, sw, snmpUser, `{"user_name": "monitor", "access_level": "ro", "auth_protocol": "sha256", "priv_protocol": "aes",
+		"auth_pass_phrase": "auth pass phrase 1", "priv_pass_phrase": "priv pass phrase 1"}`)
+}
+
 // The fake answers a refused request with its body, pass phrases and all;
 // the error must not repeat it.
 func TestSnmpv3UserRefusedCreateDoesNotEchoThePassPhrases(t *testing.T) {

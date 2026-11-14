@@ -2,6 +2,7 @@ package aoscx
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aruba/aoscxgo"
 
@@ -81,6 +82,7 @@ func resourceSnmpv3User() *schema.Resource {
 		ReadContext:   resourceSnmpv3UserRead,
 		UpdateContext: resourceSnmpv3UserUpdate,
 		DeleteContext: resourceSnmpv3UserDelete,
+		CustomizeDiff: refuseSnmpv3UserWithoutPassPhrases,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -132,6 +134,21 @@ func resourceSnmpv3User() *schema.Resource {
 			},
 		},
 	}
+}
+
+// refuseSnmpv3UserWithoutPassPhrases refuses a plan that creates the user
+// without both pass phrases, a replacement's create included, which would
+// otherwise fail only after the replacement deleted the user.
+func refuseSnmpv3UserWithoutPassPhrases(ctx context.Context, d *schema.ResourceDiff, m interface{}) error {
+	if d.Id() != "" {
+		return nil
+	}
+	for _, attribute := range []string{"auth_pass_phrase_wo", "priv_pass_phrase_wo"} {
+		if d.GetRawConfig().GetAttr(attribute).IsNull() {
+			return fmt.Errorf("SNMPv3 user %s: creating it takes %s", d.Get("name"), attribute)
+		}
+	}
+	return nil
 }
 
 func snmpv3UserPath(d *schema.ResourceData) string {
