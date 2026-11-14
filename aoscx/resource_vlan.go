@@ -165,30 +165,9 @@ func resourceVlanUpdate(ctx context.Context, d *schema.ResourceData, m interface
 	return resourceVlanRead(ctx, d, m)
 }
 
+// Delete forgets the VLAN and leaves it on the switch: deleting it would take
+// it off every port that carries it.
 func resourceVlanDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	// Warning or errors can be collected in a slice type
-	var diags diag.Diagnostics
-	var err error
-
-	sw := m.(*aoscxgo.Client)
-
-	// Retrieve VLAN from sw if existing
-	tmp_vlan := aoscxgo.Vlan{
-		VlanId: d.Get("vlan_id").(int),
-	}
-
-	err = tmp_vlan.Delete(sw)
-
-	if err != nil {
-		if err.(*aoscxgo.RequestError).StatusCode == "404 Not Found" {
-			diags = append(diags, diag.Errorf("Error Updating VLAN does not exist: %s", err.(*aoscxgo.RequestError).StatusCode)...)
-			return diags
-		} else if err.(*aoscxgo.RequestError).StatusCode != "204 No Content" {
-			diags = append(diags, diag.Errorf("Error in Updating VLAN: %s ", err.(*aoscxgo.RequestError).StatusCode)...)
-			return diags
-		}
-	}
-
 	d.SetId("")
 	return nil
 }
