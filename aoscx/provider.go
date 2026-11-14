@@ -53,6 +53,8 @@ func Provider() *schema.Provider {
 			"aoscx_system_time":    resourceSystemTime(),
 			"aoscx_ntp_server":     resourceNtpServer(),
 			"aoscx_vrf_dns":        resourceVrfDns(),
+			"aoscx_system_snmp":    resourceSystemSnmp(),
+			"aoscx_snmpv3_user":    resourceSnmpv3User(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
