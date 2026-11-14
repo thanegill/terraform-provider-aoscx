@@ -163,6 +163,24 @@ func lockPath(path string) func() {
 // map but cannot remove them. It reads them back and fails unless each holds
 // what it sent.
 func patchResource(sw *aoscxgo.Client, path string, values map[string]interface{}, maps map[string]map[string]interface{}) error {
+	read := func(names []string) (map[string]interface{}, error) {
+		return restAttributes(sw, path, names...)
+	}
+	return patchRead(sw, path, read, values, maps)
+}
+
+// patchMember is patchResource for a member of a collection, which it reads
+// whole, as `?selector=writable` answers it.
+func patchMember(sw *aoscxgo.Client, path string, values map[string]interface{}, maps map[string]map[string]interface{}) error {
+	read := func([]string) (map[string]interface{}, error) {
+		entry := map[string]interface{}{}
+		err := restGet(sw, path+"?selector=writable", &entry)
+		return entry, err
+	}
+	return patchRead(sw, path, read, values, maps)
+}
+
+func patchRead(sw *aoscxgo.Client, path string, read func([]string) (map[string]interface{}, error), values map[string]interface{}, maps map[string]map[string]interface{}) error {
 	defer lockPath(path)()
 	body := map[string]interface{}{}
 	for name, value := range values {
@@ -175,7 +193,7 @@ func patchResource(sw *aoscxgo.Client, path string, values map[string]interface{
 		}
 	}
 	if len(names) > 0 {
-		current, err := restAttributes(sw, path, names...)
+		current, err := read(names)
 		if err != nil {
 			return err
 		}
@@ -201,13 +219,34 @@ func patchResource(sw *aoscxgo.Client, path string, values map[string]interface{
 	for name := range body {
 		written = append(written, name)
 	}
-	after, err := restAttributes(sw, path, written...)
+	after, err := read(written)
 	if err != nil {
 		return err
 	}
 	for name, value := range body {
 		if !sameJSON(after[name], value) {
 			return fmt.Errorf("the switch took PATCH %s, but its %s is %v, not %v", path, name, after[name], value)
+		}
+	}
+	return nil
+}
+
+// readBack reads a resource after a write and fails unless the switch still
+// has it and holds each of names as the write declared it.
+func readBack(ctx context.Context, d *schema.ResourceData, m interface{}, read schema.ReadContextFunc, label string, names []string) diag.Diagnostics {
+	declared := map[string]interface{}{}
+	for _, name := range names {
+		declared[name] = d.Get(name)
+	}
+	if diags := read(ctx, d, m); diags.HasError() {
+		return diags
+	}
+	if d.Id() == "" {
+		return diag.Errorf("the switch took the write, but has no %s", label)
+	}
+	for _, name := range names {
+		if !sameJSON(d.Get(name), declared[name]) {
+			return diag.Errorf("the switch took the write, but its %s has %s %v, not %v", label, name, d.Get(name), declared[name])
 		}
 	}
 	return nil

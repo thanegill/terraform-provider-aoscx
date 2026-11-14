@@ -50,6 +50,9 @@ func Provider() *schema.Provider {
 			"aoscx_full_config":    resourceFullConfig(),
 			"aoscx_banner":         resourceBanner(),
 			"aoscx_lldp":           resourceLldp(),
+			"aoscx_system_time":    resourceSystemTime(),
+			"aoscx_ntp_server":     resourceNtpServer(),
+			"aoscx_vrf_dns":        resourceVrfDns(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
