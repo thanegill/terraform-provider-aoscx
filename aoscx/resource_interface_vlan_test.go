@@ -5,9 +5,11 @@ import (
 )
 
 // portOnSwitch is port 1/1/1 with a description, an MTU and VLANs 1 and 10,
-// as a switch has them before any apply.
+// as a switch has them before any apply, in the shape firmware PL.10.16
+// answers: the top-level admin null, and user_config without admin for a
+// port that is up.
 func portOnSwitch(sw *fakeSwitch) {
-	sw.resource(port1, `{"description": "old", "admin": "up", "user_config": {"admin": "up", "mtu": 9000},
+	sw.resource(port1, `{"description": "old", "admin": null, "admin_state": "up", "user_config": {"mtu": 9000},
 		"vlan_mode": "access", "vlan_tag": {"1": "/rest/v10.16/system/vlans/1"}, "vlan_trunks": {}}`)
 	sw.member("/system/vlans", "1", `{"id": 1, "name": "DEFAULT_VLAN_1", "admin": "up"}`)
 	sw.member("/system/vlans", "10", `{"id": 10, "name": "ten", "admin": "up"}`)
@@ -30,13 +32,31 @@ func TestInterfaceAdoptsAPortWithItsDeclaredDescription(t *testing.T) {
 	)
 	expectState(t, state, `{"id": "1/1/1", "name": "1/1/1", "description": "uplink", "admin_state": "up"}`)
 	p.expectNoChanges(t, "aoscx_interface", state, config)
-	expectAttributes(t, sw, port1, `{"description": "uplink", "admin": "up", "user_config": {"admin": "up", "mtu": 9000},
+	expectAttributes(t, sw, port1, `{"description": "uplink", "admin": null, "admin_state": "up", "user_config": {"mtu": 9000},
 		"vlan_mode": "access", "vlan_tag": {"1": "/rest/v10.16/system/vlans/1"}, "vlan_trunks": {}}`)
 
 	config = p.config("aoscx_interface", map[string]interface{}{"name": "1/1/1", "description": "to the router"})
 	state, errs = p.apply("aoscx_interface", state, config)
 	expectOK(t, "update", errs)
 	expectRequests(t, sw.writes(), "PATCH "+port1+` {"description": "to the router"}`)
+	p.expectNoChanges(t, "aoscx_interface", state, config)
+}
+
+// With the top-level admin null, the admin state is user_config's, up when
+// that has none.
+func TestInterfaceReadsTheAdminStateFromUserConfig(t *testing.T) {
+	sw := newFakeSwitch(t)
+	portOnSwitch(sw)
+	p := configuredProvider(t, sw)
+	config := p.config("aoscx_interface", map[string]interface{}{"name": "1/1/1", "description": "old", "admin_state": "down"})
+	state, errs := p.create("aoscx_interface", config)
+	expectOK(t, "create", errs)
+	expectState(t, state, `{"admin_state": "up"}`)
+
+	sw.resource(port1, `{"description": "old", "admin": null, "admin_state": "down", "user_config": {"admin": "down", "mtu": 9000}}`)
+	state, errs = p.read("aoscx_interface", state)
+	expectOK(t, "read", errs)
+	expectState(t, state, `{"admin_state": "down"}`)
 	p.expectNoChanges(t, "aoscx_interface", state, config)
 }
 
@@ -141,7 +161,7 @@ func TestL2InterfaceSetsOnlyVlans(t *testing.T) {
 		"vlan_trunks": {"1": "/rest/v10.16/system/vlans/1", "20": "/rest/v10.16/system/vlans/20"}}`)
 	expectState(t, state, `{"vlan_mode": "trunk", "vlan_tag": 1, "vlan_ids": [1, 20], "trunk_allowed_all": false, "native_vlan_tag": false}`)
 	p.expectNoChanges(t, "aoscx_l2_interface", state, config)
-	expectAttributes(t, sw, port1, `{"description": "old", "admin": "up", "user_config": {"admin": "up", "mtu": 9000},
+	expectAttributes(t, sw, port1, `{"description": "old", "admin": null, "admin_state": "up", "user_config": {"mtu": 9000},
 		"vlan_mode": "native-untagged", "vlan_tag": {"1": "/rest/v10.16/system/vlans/1"},
 		"vlan_trunks": {"1": "/rest/v10.16/system/vlans/1", "20": "/rest/v10.16/system/vlans/20"}}`)
 

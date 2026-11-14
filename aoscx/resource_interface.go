@@ -119,9 +119,24 @@ func resourceInterfaceRead(ctx context.Context, d *schema.ResourceData, m interf
 
 	d.Set("name", tmp_int.Name)
 	d.Set("description", tmp_int.Description)
-	d.Set("admin_state", tmp_int.AdminState)
+	d.Set("admin_state", interfaceAdminState(tmp_int))
 
 	return diags
+}
+
+// interfaceAdminState is a port's admin state: its top-level admin, which
+// firmware PL.10.16 answers null, else user_config's, else up, as the switch
+// leaves it unset for a port that is up.
+func interfaceAdminState(port aoscxgo.Interface) string {
+	if port.AdminState != "" {
+		return port.AdminState
+	}
+	if config, ok := port.InterfaceDetails["user_config"].(map[string]interface{}); ok {
+		if admin, ok := config["admin"].(string); ok && admin != "" {
+			return admin
+		}
+	}
+	return "up"
 }
 
 func resourceInterfaceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
