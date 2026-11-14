@@ -48,6 +48,8 @@ func Provider() *schema.Provider {
 			"aoscx_l3_interface":   resourceL3Interface(),
 			"aoscx_vlan_interface": resourceVlanInterface(),
 			"aoscx_full_config":    resourceFullConfig(),
+			"aoscx_banner":         resourceBanner(),
+			"aoscx_lldp":           resourceLldp(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
