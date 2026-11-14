@@ -56,6 +56,7 @@ func Provider() *schema.Provider {
 			"aoscx_system_snmp":    resourceSystemSnmp(),
 			"aoscx_snmpv3_user":    resourceSnmpv3User(),
 			"aoscx_user":           resourceUser(),
+			"aoscx_port_settings":  resourcePortSettings(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
