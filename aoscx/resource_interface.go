@@ -67,6 +67,8 @@ func resourceInterfaceCreate(ctx context.Context, d *schema.ResourceData, m inte
 			}
 		}
 
+		tmp_int.Description = d.Get("description").(string)
+
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
 			Summary:  "Interface Already Existing",
